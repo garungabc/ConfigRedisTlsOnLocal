@@ -1,0 +1,87 @@
+version: "3"
+services:
+  vs-2-go-docker-image:
+    build: 
+      context: ./
+      dockerfile: ./setup_local/docker/Dockerfile
+    ports:
+      - '8084:8080'
+    platform: linux/amd64
+    volumes:
+      - ./:/app
+    depends_on:
+      - vs-2-mysql
+      - vs-2-rabbitmq
+    links:
+      - vs-2-rabbitmq
+    networks:
+      - golang_network
+  vs-2-mysql:
+      image: mysql:5.7
+      working_dir: /application
+      platform: linux/amd64
+      volumes:
+        - .:/application
+      environment:
+        - MYSQL_ROOT_PASSWORD=root
+        - MYSQL_DATABASE=appota_ewallet_voucher-service-v2
+        - MYSQL_USER=admin
+        - MYSQL_PASSWORD=admin
+        - MYSQL_ALLOW_EMPTY_PASSWORD=yes
+      ports:
+        - "3330:3306"
+      networks:
+        - golang_network
+  vs-2-redis:
+      image: 'bitnami/redis:latest'
+      # restart: always
+      command: ["redis-server", "/etc/redis/redis.conf"]
+      platform: linux/amd64
+      environment:
+        - REDIS_DATABASE=0
+        - REDIS_PASSWORD=12345678
+        - REDIS_TLS_ENABLED=yes
+        - REDIS_TLS_PORT_NUMBER=6379
+        - REDIS_TLS_CERT_FILE=/etc/redis/redis.crt
+        - REDIS_TLS_KEY_FILE=/etc/redis/redis.key
+        - REDIS_TLS_CA_FILE=/etc/redis/ca.crt
+      volumes:
+        - ./setup_local/conf/redis_local.conf:/etc/redis/redis.conf
+        - ./setup_local/certs/redis/redis.crt:/etc/redis/redis.crt
+        - ./setup_local/certs/redis/redis.key:/etc/redis/redis.key
+        - ./setup_local/certs/redis/ca.crt:/etc/redis/ca.crt
+      networks:
+        - golang_network
+  vs-2-rabbitmq:
+      image: rabbitmq:3.12.0-beta.1-management-alpine
+      # platform: linux/amd64
+      ports:
+        - "5674:5672"
+      networks:
+        - golang_network
+  vs-2-phpmyadmin:
+      image: phpmyadmin/phpmyadmin
+      working_dir: /application
+      platform: linux/amd64
+      ports:
+       - "8108:80"
+      links:
+       - vs-2-mysql
+      environment:
+        - PMA_HOST=vs-2-mysql
+        - UPLOAD_LIMIT=300M
+      networks:
+        - golang_network
+
+  # vs-2-mokery:
+  #     image: vektra/mockery
+  #     working_dir: /application
+  #     platform: linux/amd64
+  #     volumes:
+  #       - ./:/src
+  #     networks:
+  #       - golang_network
+
+networks:
+    golang_network:
+        driver: bridge
